@@ -259,17 +259,35 @@ public class Main {
             }
         }
 
-        Pair<GraphWithWeights<Double>, Mappings> p;
-        try {
-            c = DriverManager.getConnection(url, user, password);
-            p = PostgresLoader.load(c, network, weightColumn);
-            c.close();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return;
-        }
+        switch (algorithm) {
+            case "phd": {
+                Pair<GraphWithWeights<Double>[], Mappings> p;
+                try {
+                    c = DriverManager.getConnection(url, user, password);
+                    p = PostgresLoader.load(c, network, new String[] { weightColumn, "km" });
+                    c.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    return;
+                }
 
-        edgeIterable = GraphUtils.runAlgorithm(algorithm, p);
+                edgeIterable = GraphUtils.runTwoWeightAlgorithm(algorithm, p);
+                break;
+            }
+            default: {
+                Pair<GraphWithWeights<Double>, Mappings> p;
+                try {
+                    c = DriverManager.getConnection(url, user, password);
+                    p = PostgresLoader.load(c, network, weightColumn);
+                    c.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    return;
+                }
+
+                edgeIterable = GraphUtils.runAlgorithm(algorithm, p);
+            }
+        }
 
         if (edgeIterable == null) {
             System.out.println("Exit without result");

@@ -5,8 +5,10 @@ import highways.GraphWithWeights;
 import highways.Mappings;
 import highways.algo.EdgeBetweennessCentrality;
 import highways.algo.HighwaynessLength;
+import highways.algo.ProportionateHighwaynessDistance;
 import highways.algo.approximations.HwdPartitions;
 import highways.generators.TriangleWeightGenerator;
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import toools.collections.primitive.LucIntSet;
@@ -98,6 +100,77 @@ public class GraphUtils {
 
         watch.stop("algorithm");
         System.out.println(watch.toString());
+
+        final int[] reverseMapping = simplified.y.edgeReverseMapping();
+        final LucIntSet edges = simplified.x.graph.getEdges();
+
+        return () -> edges.stream()
+                .filter(e -> result.apply(e) != null)
+                .map(e -> new Pair<>(reverseMapping[e], result.apply(e)))
+                .iterator();
+    }
+
+    public static Iterable<Pair<Integer, Double>> runTwoWeightAlgorithm(final String algorithm, final Pair<GraphWithWeights<Double>[], Mappings> gws) {
+        if (gws.x.length != 2) {
+            throw new IllegalArgumentException("Can only take weight/distance pairs");
+        }
+
+        if (gws.x[0].graph != gws.x[1].graph) {
+            throw new IllegalArgumentException("Graphs are not the same instance");
+        }
+
+        GraphWithWeights<Double> g = gws.x[0];
+        Pair<GraphWithWeights<Double>, Mappings> simplified = preprocess(new Pair<>(g, gws.y));
+
+        // Re-map distance labels after simplification
+
+        final double[] distanceRemap = new double[simplified.y.edgeMapping.size()];
+
+        {
+            // new index to id
+            int[] newReverseEdgeMapping = simplified.y.edgeReverseMapping();
+            // id to old index
+            Int2IntMap oldEdgeMapping = gws.y.edgeMapping;
+
+            SparseFunction<Integer, Double> distance = gws.x[1].weights;
+
+            for (int idx = 0; idx < newReverseEdgeMapping.length; idx++) {
+                final int id = newReverseEdgeMapping[idx];
+                final int oldIdx = oldEdgeMapping.get(id);
+                distanceRemap[idx] = distance.apply(oldIdx);
+            }
+        }
+
+        final SparseFunction<Integer, Double> distance = new DoubleArraySparseFunction(
+                distanceRemap,
+                Double.POSITIVE_INFINITY
+        );
+
+        long startTime = System.currentTimeMillis();
+
+        System.out.println("Run algorithm " + algorithm);
+
+        final SparseFunction<Integer, Double> result;
+
+        switch (algorithm) {
+            case "phd": {
+                result = new ProportionateHighwaynessDistance(
+                        simplified.x.graph,
+                        simplified.x.weights,
+                        distance
+                ).computeParallel();
+                break;
+            }
+            default:
+                throw new IllegalArgumentException("Unknown algorithm");
+        }
+
+        long stopTime = System.currentTimeMillis();
+        System.out.println((double) (stopTime - startTime) / 1_000 + "s");
+
+        if (result == null) {
+            return null;
+        }
 
         final int[] reverseMapping = simplified.y.edgeReverseMapping();
         final LucIntSet edges = simplified.x.graph.getEdges();
