@@ -15,12 +15,23 @@ application {
 repositories {
     mavenCentral()
     maven {
-        url "http://www.i3s.unice.fr/~hogie/maven_repository/"
+        url "https://www.i3s.unice.fr/~hogie/maven_repository/"
     }
 }
 
 dependencies {
     implementation group: 'org.postgresql', name: 'postgresql', version: '42.2.9'
     implementation group: 'grph', name: 'grph', version: '2.1.2'
-    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
+
+subprojects {
+    apply plugin: "java"
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        testCompile group: 'junit', name: 'junit', version: '4.12'
+    }
 }
